@@ -17,85 +17,88 @@ import {
 
 const DEFAULT_OUTPUT = { width: 900, height: 1350 };
 const STRIP_OUTPUT = { width: 600, height: 1800 };
+
+function buildVerticalSlots(count, padding = 0.06, gap = 0.035) {
+  const h = (1 - padding * 2 - gap * (count - 1)) / count;
+  return Array.from({ length: count }, (_, index) => ({
+    x: padding,
+    y: padding + index * (h + gap),
+    w: 1 - padding * 2,
+    h,
+  }));
+}
+
+function buildGridSlots(cols, rows, padding = 0.06, gap = 0.04) {
+  const w = (1 - padding * 2 - gap * (cols - 1)) / cols;
+  const h = (1 - padding * 2 - gap * (rows - 1)) / rows;
+  return Array.from({ length: cols * rows }, (_, index) => {
+    const col = index % cols;
+    const row = Math.floor(index / cols);
+    return {
+      x: padding + col * (w + gap),
+      y: padding + row * (h + gap),
+      w,
+      h,
+    };
+  });
+}
+
 const layouts = [
   {
     id: "two-wide",
-    label: "2 รูปภาพ",
+    label: "2 รูป แนวตั้ง",
     count: 2,
-    slots: [
-      { x: 0.08, y: 0.08, w: 0.84, h: 0.39 },
-      { x: 0.08, y: 0.51, w: 0.84, h: 0.39 },
-    ],
+    slots: buildVerticalSlots(2),
   },
   {
     id: "three-stack",
-    label: "3 รูปภาพ",
+    label: "3 รูป สตริป",
     count: 3,
-    slots: [
-      { x: 0.06, y: 0.05, w: 0.88, h: 0.265 },
-      { x: 0.06, y: 0.345, w: 0.88, h: 0.265 },
-      { x: 0.06, y: 0.64, w: 0.88, h: 0.265 },
-    ],
+    slots: buildVerticalSlots(3, 0.05, 0.03),
   },
   {
     id: "four-stack",
-    label: "4 รูปภาพ",
+    label: "4 รูป สตริป",
     count: 4,
-    slots: [
-      { x: 0.06, y: 0.045, w: 0.88, h: 0.205 },
-      { x: 0.06, y: 0.27, w: 0.88, h: 0.205 },
-      { x: 0.06, y: 0.495, w: 0.88, h: 0.205 },
-      { x: 0.06, y: 0.72, w: 0.88, h: 0.205 },
-    ],
+    slots: buildVerticalSlots(4, 0.05, 0.025),
   },
   {
     id: "four-grid",
-    label: "4 รูปภาพ",
+    label: "4 รูป กริด",
     count: 4,
-    slots: [
-      { x: 0.055, y: 0.065, w: 0.425, h: 0.39 },
-      { x: 0.52, y: 0.065, w: 0.425, h: 0.39 },
-      { x: 0.055, y: 0.49, w: 0.425, h: 0.39 },
-      { x: 0.52, y: 0.49, w: 0.425, h: 0.39 },
-    ],
+    slots: buildGridSlots(2, 2),
   },
   {
     id: "nine-grid",
-    label: "9 รูปภาพ",
+    label: "9 รูป กริด",
     count: 9,
-    slots: Array.from({ length: 9 }, (_, index) => {
-      const col = index % 3;
-      const row = Math.floor(index / 3);
-      return { x: 0.07 + col * 0.3, y: 0.08 + row * 0.28, w: 0.26, h: 0.24 };
-    }),
+    slots: buildGridSlots(3, 3, 0.05, 0.03),
   },
 ];
 
 const colors = [
   "#ffffff",
-  "#000000",
+  "#fff0f6",
   "#ffdce8",
-  "#f6b7c9",
+  "#ffc8dd",
   "#bfe3ff",
-  "#a997ff",
-  "#fff19b",
-  "#ffd4b2",
-  "#087d3f",
-  "#9da09a",
-  "#251006",
-  "#0b145a",
-  "#8e1717",
+  "#e8d4ff",
+  "#fff4a3",
+  "#c8f5e4",
   "#ffe1f4",
+  "#f6edff",
+  "#ffd4b2",
+  "#251006",
 ];
 
 const photoBorderColors = [
   "#ffffff",
-  "#000000",
-  "#ff4b91",
-  "#ffdce8",
+  "#ffc8dd",
+  "#ff6b9d",
   "#bfe3ff",
-  "#fff19b",
-  "#8e1717",
+  "#fff4a3",
+  "#e8d4ff",
+  "#c8f5e4",
   "#251006",
 ];
 
@@ -121,7 +124,7 @@ const doodleStickers = [
 ];
 
 const categories = [
-  { id: "cats", label: "Cute Cats", preview: catStickers[1].src, stickers: catStickers },
+  { id: "cats", label: "แมวน่ารัก", preview: catStickers[1].src, stickers: catStickers },
   { id: "kawaii", label: "Kawaii", preview: doodleStickers[0].src, stickers: doodleStickers },
   { id: "new-pack", label: "New Pack", preview: newPackStickers[3].src, stickers: newPackStickers },
 ];
@@ -159,8 +162,8 @@ export default function Home() {
   const [countdown, setCountdown] = useState(null);
   const [photos, setPhotos] = useState([]);
   const [layoutId, setLayoutId] = useState("four-grid");
-  const [frameColor, setFrameColor] = useState("#ffffff");
-  const [customColor, setCustomColor] = useState("#ff4b91");
+  const [frameColor, setFrameColor] = useState("#fff0f6");
+  const [customColor, setCustomColor] = useState("#ffc8dd");
   const [photoBorderColor, setPhotoBorderColor] = useState("#ffffff");
   const [stickers, setStickers] = useState([]);
   const [selectedSticker, setSelectedSticker] = useState(null);
@@ -440,28 +443,36 @@ export default function Home() {
   return (
     <main className="app-shell">
       <section className="hero">
-        <h1>ตู้ถ่ายรูป Photo Booth Web | กล้องออนไลน์และสร้างรูปจากตู้สติ๊กเกอร์</h1>
+        <div className="hero-badges">
+          <span className="hero-badge">✿ kawaii</span>
+          <span className="hero-badge blue">♡ sanrio vibes</span>
+        </div>
+        <h1>
+          <span className="hero-emoji">📸</span>
+          Cute Photo Booth
+          <span className="hero-emoji">🎀</span>
+        </h1>
         <p>
-          ถ่ายรูปหรืออัปโหลดภาพ เลือกเส้นกริด ปรับแสงตอนถ่าย สีกรอบ และแปะสติ๊กเกอร์ที่ขยับ
-          ปรับขนาด หมุน แล้วดาวน์โหลดได้ทันที
+          ถ่ายรูปหรืออัปโหลดภาพ เลือกเลย์เอาต์ แต่งสีกรอบ แล้วแปะสติ๊กเกอร์น่ารักๆ
+          ปรับขนาด หมุน แล้วดาวน์โหลดได้เลยค่ะ ♡
         </p>
       </section>
 
       <section className={`workbench ${isEditing ? "edit-mode" : "capture-mode"}`}>
         <aside className="toolbar" aria-label="เครื่องมือ">
-          <button className="tool-button" onClick={() => setModal("layouts")} title="เส้นกริด">
-            <Grid3X3 size={24} />
-            <span>เส้นกริด</span>
+          <button className="tool-button" onClick={() => setModal("layouts")} title="เลย์เอาต์">
+            <Grid3X3 size={22} />
+            <span>เลย์เอาต์</span>
           </button>
           {isEditing ? (
             <button className="tool-button" onClick={() => setModal("categories")} title="สติ๊กเกอร์">
-              <Sticker size={24} />
+              <Sticker size={22} />
               <span>สติ๊กเกอร์</span>
             </button>
           ) : (
-            <button className="tool-button" onClick={() => setModal("lighting")} title="เรื่องแสง">
-              <Palette size={24} />
-              <span>เรื่องแสง</span>
+            <button className="tool-button" onClick={() => setModal("lighting")} title="สีพื้นหลัง">
+              <Palette size={22} />
+              <span>พื้นหลัง</span>
             </button>
           )}
         </aside>
@@ -551,7 +562,7 @@ export default function Home() {
                 ) : streaming && mediaStream ? (
                   <LiveSlotVideo stream={mediaStream} mirrored={mirrorCamera} />
                 ) : (
-                  <div className="slot-placeholder">PHOTO</div>
+                  <div className="slot-placeholder">♡ photo</div>
                 )}
               </div>
             ))}
@@ -716,7 +727,7 @@ export default function Home() {
       </section>
 
       {modal === "layouts" && (
-        <Modal title="เส้นกริด" onClose={() => setModal(null)}>
+        <Modal title="♡ เลือกเลย์เอาต์" onClose={() => setModal(null)}>
           <div className="layout-grid">
             {layouts.map((layout) => (
               <button
@@ -736,7 +747,7 @@ export default function Home() {
       )}
 
       {modal === "categories" && (
-        <Modal title="หมวดสติ๊กเกอร์" onClose={() => setModal(null)}>
+        <Modal title="♡ สติ๊กเกอร์" onClose={() => setModal(null)}>
           <div className="category-grid">
             {categories.map((category) => (
               <button
@@ -768,11 +779,11 @@ export default function Home() {
       )}
 
       {modal === "lighting" && (
-        <Modal title="เรื่องแสง" onClose={() => setModal(null)}>
+        <Modal title="♡ สีพื้นหลัง" onClose={() => setModal(null)}>
           <div className="panel-section">
-            <p className="panel-label">เลือกสีพื้นหลังรอบตู้ถ่ายรูป</p>
+            <p className="panel-label">เลือกสีพื้นหลังหน้าเว็บให้เข้ากับอารมณ์ค่ะ</p>
             <div className="color-row">
-              {["#fff9fb", "#fff35a", "#e8f7ff", "#f6edff", "#f4fff0"].map((color) => (
+              {["#fff9fc", "#fffbe8", "#e8f6ff", "#f6edff", "#f0fff8"].map((color) => (
                 <button
                   key={color}
                   className="swatch"
@@ -826,8 +837,17 @@ function LiveSlotVideo({ stream, mirrored }) {
 function MiniLayout({ layout }) {
   return (
     <div className="mini-layout">
-      {layout.slots.map((_, index) => (
-        <span key={index} className="mini-cell" />
+      {layout.slots.map((slot, index) => (
+        <span
+          key={index}
+          className="mini-cell"
+          style={{
+            left: `${slot.x * 100}%`,
+            top: `${slot.y * 100}%`,
+            width: `${slot.w * 100}%`,
+            height: `${slot.h * 100}%`,
+          }}
+        />
       ))}
     </div>
   );
