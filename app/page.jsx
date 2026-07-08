@@ -1,5 +1,6 @@
 "use client";
 
+import { GIFEncoder, applyPalette, quantize } from "gifenc";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
@@ -17,6 +18,15 @@ import {
 
 const DEFAULT_OUTPUT = { width: 900, height: 1350 };
 const STRIP_OUTPUT = { width: 600, height: 1800 };
+const WIDE_OUTPUT = { width: 1350, height: 900 };
+const SQUARE_OUTPUT = { width: 1200, height: 1200 };
+const BOOMERANG_FRAME_COUNT = 10;
+const BOOMERANG_FRAME_DELAY = 80;
+
+const captureModes = [
+  { id: "photo", label: "รูปภาพ" },
+  { id: "boomerang", label: "บูมเมอร์แรง" },
+];
 
 function buildVerticalSlots(count, padding = 0.06, gap = 0.035) {
   const h = (1 - padding * 2 - gap * (count - 1)) / count;
@@ -41,6 +51,16 @@ function buildGridSlots(cols, rows, padding = 0.06, gap = 0.04) {
       h,
     };
   });
+}
+
+function buildHorizontalSlots(count, padding = 0.06, gap = 0.035) {
+  const w = (1 - padding * 2 - gap * (count - 1)) / count;
+  return Array.from({ length: count }, (_, index) => ({
+    x: padding + index * (w + gap),
+    y: padding,
+    w,
+    h: 1 - padding * 2,
+  }));
 }
 
 const layouts = [
@@ -74,6 +94,74 @@ const layouts = [
     count: 9,
     slots: buildGridSlots(3, 3, 0.05, 0.03),
   },
+  {
+    id: "two-horizontal",
+    label: "2 รูป แนวนอน",
+    count: 2,
+    output: WIDE_OUTPUT,
+    slots: buildHorizontalSlots(2),
+  },
+  {
+    id: "three-horizontal",
+    label: "3 รูป แนวนอน",
+    count: 3,
+    output: WIDE_OUTPUT,
+    slots: buildHorizontalSlots(3, 0.05, 0.03),
+  },
+  {
+    id: "six-grid",
+    label: "6 รูป กริด",
+    count: 6,
+    slots: buildGridSlots(3, 2, 0.05, 0.03),
+  },
+  {
+    id: "six-strip",
+    label: "6 รูป สตริป",
+    count: 6,
+    output: STRIP_OUTPUT,
+    slots: buildVerticalSlots(6, 0.045, 0.018),
+  },
+  {
+    id: "square-four",
+    label: "4 รูป จัตุรัส",
+    count: 4,
+    output: SQUARE_OUTPUT,
+    slots: buildGridSlots(2, 2, 0.055, 0.035),
+  },
+  {
+    id: "feature-two",
+    label: "1 ใหญ่ + 2 เล็ก",
+    count: 3,
+    slots: [
+      { x: 0.06, y: 0.06, w: 0.88, h: 0.52 },
+      { x: 0.06, y: 0.62, w: 0.425, h: 0.32 },
+      { x: 0.515, y: 0.62, w: 0.425, h: 0.32 },
+    ],
+  },
+  {
+    id: "feature-three",
+    label: "1 ใหญ่ + 3 เล็ก",
+    count: 4,
+    slots: [
+      { x: 0.06, y: 0.06, w: 0.88, h: 0.48 },
+      { x: 0.06, y: 0.58, w: 0.273, h: 0.36 },
+      { x: 0.363, y: 0.58, w: 0.273, h: 0.36 },
+      { x: 0.667, y: 0.58, w: 0.273, h: 0.36 },
+    ],
+  },
+  {
+    id: "cover-strip",
+    label: "ปก + 4 รูป",
+    count: 5,
+    output: STRIP_OUTPUT,
+    slots: [
+      { x: 0.05, y: 0.045, w: 0.9, h: 0.28 },
+      { x: 0.05, y: 0.35, w: 0.9, h: 0.14 },
+      { x: 0.05, y: 0.515, w: 0.9, h: 0.14 },
+      { x: 0.05, y: 0.68, w: 0.9, h: 0.14 },
+      { x: 0.05, y: 0.845, w: 0.9, h: 0.11 },
+    ],
+  },
 ];
 
 const colors = [
@@ -102,6 +190,25 @@ const photoBorderColors = [
   "#251006",
 ];
 
+const photoFilters = [
+  {
+    id: "clean",
+    label: "ธรรมดา",
+    css: "none",
+    canvas: "none",
+    vignette: 0,
+    grain: 0,
+  },
+  {
+    id: "booth-noir",
+    label: "ฟิลเตอร์",
+    css: "grayscale(1) sepia(0.18) contrast(1.32) brightness(1.08)",
+    canvas: "grayscale(1) sepia(18%) contrast(132%) brightness(108%)",
+    vignette: 0.42,
+    grain: 0.16,
+  },
+];
+
 const catStickers = Array.from({ length: 15 }, (_, index) => ({
   id: `cat-${index + 1}`,
   name: `Cat ${index + 1}`,
@@ -113,6 +220,21 @@ const newPackStickers = Array.from({ length: 15 }, (_, index) => ({
   name: `New Pack ${index + 1}`,
   src: `/stickers/new-pack/new-${String(index + 1).padStart(2, "0")}.png`,
 }));
+
+const packOneStickers = Array.from({ length: 29 }, (_, index) => ({
+  id: `pack-one-${index + 1}`,
+  name: `Pack 1 ${index + 1}`,
+  src: `/stickers/pack-1/pack-1-${String(index + 1).padStart(2, "0")}.png`,
+}));
+
+const packTwoStickers = Array.from({ length: 25 }, (_, index) => {
+  const item = index + 1;
+  return {
+    id: `pack-two-${item}`,
+    name: `Pack 2 ${item}`,
+    src: `/stickers/pack-2/pack-2-${String(item).padStart(2, "0")}.${item === 14 ? "jpg" : "png"}`,
+  };
+});
 
 const doodleStickers = [
   { id: "star", name: "Star", src: svgSticker("⭐", "#ff7bb0") },
@@ -127,6 +249,8 @@ const categories = [
   { id: "cats", label: "แมวน่ารัก", preview: catStickers[1].src, stickers: catStickers },
   { id: "kawaii", label: "Kawaii", preview: doodleStickers[0].src, stickers: doodleStickers },
   { id: "new-pack", label: "New Pack", preview: newPackStickers[3].src, stickers: newPackStickers },
+  { id: "pack-one", label: "Pack 1", preview: packOneStickers[0].src, stickers: packOneStickers },
+  { id: "pack-two", label: "Pack 2", preview: packTwoStickers[0].src, stickers: packTwoStickers },
 ];
 
 function svgSticker(text, color) {
@@ -142,6 +266,54 @@ function fitImage(ctx, img, x, y, w, h) {
   ctx.drawImage(img, x + (w - nw) / 2, y + (h - nh) / 2, nw, nh);
 }
 
+function drawPhotoOverlay(ctx, x, y, w, h, filter) {
+  if (filter.vignette) {
+    const gradient = ctx.createRadialGradient(
+      x + w / 2,
+      y + h / 2,
+      Math.min(w, h) * 0.2,
+      x + w / 2,
+      y + h / 2,
+      Math.max(w, h) * 0.68,
+    );
+    gradient.addColorStop(0, "rgba(255,255,255,0)");
+    gradient.addColorStop(0.72, "rgba(0,0,0,0)");
+    gradient.addColorStop(1, `rgba(0,0,0,${filter.vignette})`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, y, w, h);
+  }
+
+  if (filter.grain) {
+    ctx.globalAlpha = filter.grain;
+    ctx.fillStyle = "#ffffff";
+    const step = Math.max(4, Math.round(Math.min(w, h) / 48));
+    for (let gy = y; gy < y + h; gy += step) {
+      for (let gx = x + ((gy / step) % 2) * (step / 2); gx < x + w; gx += step * 2) {
+        ctx.fillRect(gx, gy, 1, 1);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function isBoomerangPhoto(photo) {
+  return photo && typeof photo === "object" && photo.type === "boomerang";
+}
+
+function getPhotoPreview(photo) {
+  if (isBoomerangPhoto(photo)) return photo.frames[0];
+  return photo;
+}
+
+function getPhotoFrame(photo, frameIndex) {
+  if (isBoomerangPhoto(photo)) return photo.frames[frameIndex % photo.frames.length];
+  return photo;
+}
+
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -153,6 +325,7 @@ function loadImage(src) {
 }
 
 function getOutputForLayout(layout) {
+  if (layout.output) return layout.output;
   if (layout.id === "three-stack" || layout.id === "four-stack") return STRIP_OUTPUT;
   return DEFAULT_OUTPUT;
 }
@@ -161,10 +334,12 @@ export default function Home() {
   const [timer, setTimer] = useState(3);
   const [countdown, setCountdown] = useState(null);
   const [photos, setPhotos] = useState([]);
+  const [captureMode, setCaptureMode] = useState("photo");
   const [layoutId, setLayoutId] = useState("four-grid");
-  const [frameColor, setFrameColor] = useState("#fff0f6");
+  const [frameColor, setFrameColor] = useState("#ffffff");
   const [customColor, setCustomColor] = useState("#ffc8dd");
   const [photoBorderColor, setPhotoBorderColor] = useState("#ffffff");
+  const [photoFilterId, setPhotoFilterId] = useState("clean");
   const [stickers, setStickers] = useState([]);
   const [selectedSticker, setSelectedSticker] = useState(null);
   const [modal, setModal] = useState(null);
@@ -174,6 +349,7 @@ export default function Home() {
   const [step, setStep] = useState("capture");
   const [mediaStream, setMediaStream] = useState(null);
   const [isShooting, setIsShooting] = useState(false);
+  const [isBoomerangCapturing, setIsBoomerangCapturing] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const [stageSize, setStageSize] = useState({ width: 390, height: 585 });
   const [viewportSize, setViewportSize] = useState({ width: 1280, height: 720 });
@@ -189,6 +365,10 @@ export default function Home() {
   const currentOutput = useMemo(
     () => getOutputForLayout(currentLayout),
     [currentLayout],
+  );
+  const currentPhotoFilter = useMemo(
+    () => photoFilters.find((filter) => filter.id === photoFilterId) ?? photoFilters[0],
+    [photoFilterId],
   );
 
   useEffect(() => {
@@ -263,6 +443,26 @@ export default function Home() {
     return canvas.toDataURL("image/png");
   }
 
+  async function captureBoomerangClip() {
+    const frames = [];
+    setIsBoomerangCapturing(true);
+    try {
+      for (let index = 0; index < BOOMERANG_FRAME_COUNT; index += 1) {
+        const frame = captureFrame();
+        if (!frame) break;
+        frames.push(frame);
+        await sleep(BOOMERANG_FRAME_DELAY);
+      }
+    } finally {
+      setIsBoomerangCapturing(false);
+    }
+    if (!frames.length) return null;
+    return {
+      type: "boomerang",
+      frames: [...frames, ...frames.slice(1, -1).reverse()],
+    };
+  }
+
   async function runTimedCapture() {
     if (isShooting) return;
     setIsShooting(true);
@@ -276,7 +476,7 @@ export default function Home() {
     const nextPhotos = [];
     for (let index = 0; index < currentLayout.count; index += 1) {
       await runCountdown(timer);
-      const photo = captureFrame();
+      const photo = captureMode === "boomerang" ? await captureBoomerangClip() : captureFrame();
       if (!photo) break;
       nextPhotos.push(photo);
       setPhotos([...nextPhotos]);
@@ -372,19 +572,17 @@ export default function Home() {
     window.removeEventListener("pointerup", pointerUp);
   }
 
-  async function downloadStrip() {
-    const output = currentOutput;
-    const canvas = document.createElement("canvas");
-    canvas.width = output.width;
-    canvas.height = output.height;
-    const ctx = canvas.getContext("2d");
+  async function renderStripFrame(ctx, output, frameIndex = 0) {
     ctx.fillStyle = frameColor;
     ctx.fillRect(0, 0, output.width, output.height);
 
     const loadedPhotos =
       photos.length > 0
         ? await Promise.all(
-            currentLayout.slots.map((_, index) => (photos[index] ? loadImage(photos[index]) : null)),
+            currentLayout.slots.map((_, index) => {
+              const frame = getPhotoFrame(photos[index], frameIndex);
+              return frame ? loadImage(frame) : null;
+            }),
           )
         : [];
 
@@ -397,7 +595,12 @@ export default function Home() {
       ctx.beginPath();
       ctx.rect(x, y, w, h);
       ctx.clip();
-      if (loadedPhotos[index]) fitImage(ctx, loadedPhotos[index], x, y, w, h);
+      if (loadedPhotos[index]) {
+        ctx.filter = currentPhotoFilter.canvas;
+        fitImage(ctx, loadedPhotos[index], x, y, w, h);
+        ctx.filter = "none";
+        drawPhotoOverlay(ctx, x, y, w, h, currentPhotoFilter);
+      }
       else {
         ctx.fillStyle = "#f5f1f5";
         ctx.fillRect(x, y, w, h);
@@ -422,11 +625,52 @@ export default function Home() {
       ctx.drawImage(img, -stickerWidth / 2, -stickerHeight / 2, stickerWidth, stickerHeight);
       ctx.restore();
     }
+  }
 
+  function triggerDownload(url, filename) {
     const link = document.createElement("a");
-    link.download = "cute-photobooth.png";
-    link.href = canvas.toDataURL("image/png");
+    link.download = filename;
+    link.href = url;
     link.click();
+  }
+
+  async function downloadStrip() {
+    const output = currentOutput;
+    const canvas = document.createElement("canvas");
+    canvas.width = output.width;
+    canvas.height = output.height;
+    const ctx = canvas.getContext("2d");
+    const hasBoomerang = photos.some(isBoomerangPhoto);
+
+    if (hasBoomerang) {
+      const frameCount = Math.max(
+        ...photos.map((photo) => (isBoomerangPhoto(photo) ? photo.frames.length : 1)),
+      );
+      const gif = GIFEncoder();
+
+      for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+        await renderStripFrame(ctx, output, frameIndex);
+        const { data } = ctx.getImageData(0, 0, output.width, output.height);
+        const palette = quantize(data, 256);
+        const indexedFrame = applyPalette(data, palette);
+        gif.writeFrame(indexedFrame, output.width, output.height, {
+          palette,
+          delay: BOOMERANG_FRAME_DELAY,
+          repeat: 0,
+        });
+      }
+
+      gif.finish();
+      const blob = new Blob([gif.bytes()], { type: "image/gif" });
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, "photobooth-boomerang.gif");
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return;
+    }
+
+    await renderStripFrame(ctx, output);
+
+    triggerDownload(canvas.toDataURL("image/png"), "photobooth.png");
   }
 
   const selected = stickers.find((sticker) => sticker.id === selectedSticker);
@@ -444,17 +688,13 @@ export default function Home() {
     <main className="app-shell">
       <section className="hero">
         <div className="hero-badges">
-          <span className="hero-badge">✿ kawaii</span>
-          <span className="hero-badge blue">♡ sanrio vibes</span>
+          <span className="hero-badge">Photo Booth</span>
+          <span className="hero-badge blue">ออนไลน์</span>
         </div>
-        <h1>
-          <span className="hero-emoji">📸</span>
-          Cute Photo Booth
-          <span className="hero-emoji">🎀</span>
-        </h1>
+        <h1>Photo Booth</h1>
         <p>
-          ถ่ายรูปหรืออัปโหลดภาพ เลือกเลย์เอาต์ แต่งสีกรอบ แล้วแปะสติ๊กเกอร์น่ารักๆ
-          ปรับขนาด หมุน แล้วดาวน์โหลดได้เลยค่ะ ♡
+          ถ่ายรูปหรืออัปโหลดภาพ เลือกเลย์เอาต์ แต่งสีกรอบ
+          แปะสติ๊กเกอร์ แล้วดาวน์โหลดได้เลย
         </p>
       </section>
 
@@ -465,20 +705,39 @@ export default function Home() {
             <span>เลย์เอาต์</span>
           </button>
           {isEditing ? (
-            <button className="tool-button" onClick={() => setModal("categories")} title="สติ๊กเกอร์">
-              <Sticker size={22} />
-              <span>สติ๊กเกอร์</span>
-            </button>
+            <>
+              <button className="tool-button" onClick={() => setModal("filters")} title="ฟิลเตอร์">
+                <Palette size={22} />
+                <span>ฟิลเตอร์</span>
+              </button>
+              <button className="tool-button" onClick={() => setModal("categories")} title="สติ๊กเกอร์">
+                <Sticker size={22} />
+                <span>สติ๊กเกอร์</span>
+              </button>
+            </>
           ) : (
-            <button className="tool-button" onClick={() => setModal("lighting")} title="สีพื้นหลัง">
+            <button className="tool-button" onClick={() => setModal("filters")} title="ฟิลเตอร์">
               <Palette size={22} />
-              <span>พื้นหลัง</span>
+              <span>ฟิลเตอร์</span>
             </button>
           )}
         </aside>
 
         <div className="strip-stage-wrap">
           <div className="capture-panel">
+            <div className="mode-row" aria-label="โหมดถ่ายภาพ">
+              {captureModes.map((mode) => (
+                <button
+                  key={mode.id}
+                  className={`mode-button ${captureMode === mode.id ? "active" : ""}`}
+                  onClick={() => setCaptureMode(mode.id)}
+                  disabled={isShooting}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+
             <div className="timer-row">
               {[3, 5, 10].map((item) => (
                 <button
@@ -515,7 +774,9 @@ export default function Home() {
                 <Camera size={19} />
                 {isShooting
                   ? `กำลังถ่าย ${photos.length}/${currentLayout.count}`
-                  : `เริ่มถ่าย ${currentLayout.count} รูป`}
+                  : captureMode === "boomerang"
+                    ? `เริ่มบูมเมอร์แรง ${currentLayout.count} ช่อง`
+                    : `เริ่มถ่าย ${currentLayout.count} รูป`}
               </button>
               <button className="outline-button" onClick={() => fileRef.current?.click()}>
                 <ImagePlus size={18} />
@@ -535,13 +796,16 @@ export default function Home() {
 
           <div
             ref={stageRef}
-            className="strip-stage"
+            className={`strip-stage ${isBoomerangCapturing ? "boomerang-capturing" : ""}`}
             style={{
               "--frame-color": frameColor,
               "--stage-aspect": `${currentOutput.width} / ${currentOutput.height}`,
               "--stage-ratio": currentOutput.width / currentOutput.height,
               "--photo-border-color": photoBorderColor ?? "transparent",
               "--photo-border-width": photoBorderColor ? "4px" : "0px",
+              "--photo-filter": currentPhotoFilter.css,
+              "--photo-vignette": currentPhotoFilter.vignette,
+              "--photo-grain": currentPhotoFilter.grain,
               width: `${stageDisplayWidth}px`,
             }}
             onPointerDown={() => setSelectedSticker(null)}
@@ -558,15 +822,16 @@ export default function Home() {
                 }}
               >
                 {photos[index] ? (
-                  <img src={photos[index]} alt={`photo ${index + 1}`} />
+                  <PhotoSlot photo={photos[index]} alt={`photo ${index + 1}`} />
                 ) : streaming && mediaStream ? (
                   <LiveSlotVideo stream={mediaStream} mirrored={mirrorCamera} />
                 ) : (
-                  <div className="slot-placeholder">♡ photo</div>
+                  <div className="slot-placeholder">photo</div>
                 )}
               </div>
             ))}
             {countdown ? <div className="countdown">{countdown}</div> : null}
+            {isBoomerangCapturing ? <div className="boomerang-capture-flash">กำลังถ่าย</div> : null}
             <div className="sticker-layer">
               {stickers.map((sticker) => (
                 <div
@@ -588,7 +853,10 @@ export default function Home() {
 
           <div className="thumbnail-rail">
             {photos.map((photo, index) => (
-              <img className="thumbnail" key={`${photo}-${index}`} src={photo} alt={`thumbnail ${index + 1}`} />
+              <div className="thumbnail-wrap" key={`${getPhotoPreview(photo)}-${index}`}>
+                <img className="thumbnail" src={getPhotoPreview(photo)} alt={`thumbnail ${index + 1}`} />
+                {isBoomerangPhoto(photo) ? <span>GIF</span> : null}
+              </div>
             ))}
           </div>
 
@@ -606,6 +874,8 @@ export default function Home() {
                 setPhotos([]);
                 setStickers([]);
                 setSelectedSticker(null);
+                setCountdown(null);
+                setIsBoomerangCapturing(false);
                 setStep("capture");
               }}
             >
@@ -616,6 +886,22 @@ export default function Home() {
         </div>
 
         {isEditing ? <aside className="controls-panel">
+          <section className="panel-section">
+            <h2>ฟิลเตอร์</h2>
+            <div className="filter-grid">
+              {photoFilters.map((filter) => (
+                <button
+                  key={filter.id}
+                  className={`filter-card ${photoFilterId === filter.id ? "active" : ""}`}
+                  onClick={() => setPhotoFilterId(filter.id)}
+                >
+                  <span className="filter-preview" style={{ "--preview-filter": filter.css }} />
+                  <strong>{filter.label}</strong>
+                </button>
+              ))}
+            </div>
+          </section>
+
           <section className="panel-section">
             <h2>สีกรอบ</h2>
             <div className="color-row">
@@ -727,7 +1013,7 @@ export default function Home() {
       </section>
 
       {modal === "layouts" && (
-        <Modal title="♡ เลือกเลย์เอาต์" onClose={() => setModal(null)}>
+        <Modal title="เลือกเลย์เอาต์" onClose={() => setModal(null)}>
           <div className="layout-grid">
             {layouts.map((layout) => (
               <button
@@ -747,7 +1033,7 @@ export default function Home() {
       )}
 
       {modal === "categories" && (
-        <Modal title="♡ สติ๊กเกอร์" onClose={() => setModal(null)}>
+        <Modal title="สติ๊กเกอร์" onClose={() => setModal(null)}>
           <div className="category-grid">
             {categories.map((category) => (
               <button
@@ -778,26 +1064,26 @@ export default function Home() {
         </Modal>
       )}
 
-      {modal === "lighting" && (
-        <Modal title="♡ สีพื้นหลัง" onClose={() => setModal(null)}>
-          <div className="panel-section">
-            <p className="panel-label">เลือกสีพื้นหลังหน้าเว็บให้เข้ากับอารมณ์ค่ะ</p>
-            <div className="color-row">
-              {["#fff9fc", "#fffbe8", "#e8f6ff", "#f6edff", "#f0fff8"].map((color) => (
-                <button
-                  key={color}
-                  className="swatch"
-                  style={{ "--c": color }}
-                  onClick={() => {
-                    document.body.style.background = color;
-                    setModal(null);
-                  }}
-                />
-              ))}
-            </div>
+      {modal === "filters" && (
+        <Modal title="ฟิลเตอร์" onClose={() => setModal(null)}>
+          <div className="filter-grid modal-filter-grid">
+            {photoFilters.map((filter) => (
+              <button
+                key={filter.id}
+                className={`filter-card ${photoFilterId === filter.id ? "active" : ""}`}
+                onClick={() => {
+                  setPhotoFilterId(filter.id);
+                  setModal(null);
+                }}
+              >
+                <span className="filter-preview" style={{ "--preview-filter": filter.css }} />
+                <strong>{filter.label}</strong>
+              </button>
+            ))}
           </div>
         </Modal>
       )}
+
     </main>
   );
 }
@@ -818,6 +1104,34 @@ function Modal({ title, children, onClose }) {
   );
 }
 
+function PhotoSlot({ photo, alt }) {
+  const [frameIndex, setFrameIndex] = useState(0);
+
+  useEffect(() => {
+    if (!isBoomerangPhoto(photo)) {
+      setFrameIndex(0);
+      return undefined;
+    }
+
+    const tick = window.setInterval(() => {
+      setFrameIndex((current) => (current + 1) % photo.frames.length);
+    }, BOOMERANG_FRAME_DELAY);
+
+    return () => window.clearInterval(tick);
+  }, [photo]);
+
+  if (isBoomerangPhoto(photo)) {
+    return (
+      <>
+        <img src={photo.frames[frameIndex] ?? photo.frames[0]} alt={alt} />
+        <span className="boomerang-badge">บูมเมอร์แรง</span>
+      </>
+    );
+  }
+
+  return <img src={photo} alt={alt} />;
+}
+
 function LiveSlotVideo({ stream, mirrored }) {
   return (
     <video
@@ -835,8 +1149,12 @@ function LiveSlotVideo({ stream, mirrored }) {
 }
 
 function MiniLayout({ layout }) {
+  const output = getOutputForLayout(layout);
   return (
-    <div className="mini-layout">
+    <div
+      className="mini-layout"
+      style={{ "--mini-aspect": `${output.width} / ${output.height}` }}
+    >
       {layout.slots.map((slot, index) => (
         <span
           key={index}
