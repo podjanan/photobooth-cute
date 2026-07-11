@@ -686,16 +686,28 @@ export default function Home() {
 
   return (
     <main className="app-shell">
+      <header className="site-header">
+        <a className="wordmark" href="#top" aria-label="Full Frame home">
+          FULL<span>FRAME</span><sup>®</sup>
+        </a>
+        <div className="header-meta">
+          <span>Digital photo studio</span>
+          <span>Bangkok · {new Date().getFullYear()}</span>
+        </div>
+      </header>
       <section className="hero">
         <div className="hero-badges">
-          <span className="hero-badge">Photo Booth</span>
-          <span className="hero-badge blue">ออนไลน์</span>
+          <span className="hero-badge">01 / Create</span>
+          <span className="hero-badge blue">Online studio</span>
         </div>
-        <h1>Photo Booth</h1>
+        <h1>YOUR MOMENT.<br /><em>YOUR FRAME.</em></h1>
         <p>
-          ถ่ายรูปหรืออัปโหลดภาพ เลือกเลย์เอาต์ แต่งสีกรอบ
-          แปะสติ๊กเกอร์ แล้วดาวน์โหลดได้เลย
+          ถ่าย อัปโหลด แล้วจัดวางเรื่องราวของคุณลงในเฟรมเดียว
+          เลือกเลย์เอาต์ เติมสติกเกอร์ และจบงานได้ในไม่กี่คลิก
         </p>
+        <button className="hero-layout-button" onClick={() => setModal("layouts")}>
+          <Grid3X3 size={18} /> Browse layouts <span>↗</span>
+        </button>
       </section>
 
       <section className={`workbench ${isEditing ? "edit-mode" : "capture-mode"}`}>

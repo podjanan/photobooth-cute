@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Photo Booth",
-  description: "ตู้ถ่ายรูปออนไลน์ — ถ่ายรูป เลือกเลย์เอาต์ แต่งสติ๊กเกอร์ ดาวน์โหลดได้เลย",
+  title: "FULL FRAME — Digital Photo Booth",
+  description: "สตูดิโอถ่ายภาพออนไลน์ เลือกเฟรม แต่งคอลลาจ และดาวน์โหลดได้ทันที",
 };
 
 export default function RootLayout({ children }) {
