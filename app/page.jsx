@@ -129,6 +129,19 @@ const layouts = [
     slots: buildGridSlots(2, 2, 0.055, 0.035),
   },
   {
+    id: "warm-memory",
+    label: "Warm Memory 4 ช่อง",
+    count: 4,
+    output: SQUARE_OUTPUT,
+    caption: "เก็บ\nวันนี้\nไว้ ♡",
+    slots: [
+      { x: 0.17, y: 0.045, w: 0.32, h: 0.445 },
+      { x: 0.515, y: 0.045, w: 0.32, h: 0.445 },
+      { x: 0.17, y: 0.51, w: 0.32, h: 0.445 },
+      { x: 0.515, y: 0.51, w: 0.32, h: 0.445 },
+    ],
+  },
+  {
     id: "feature-two",
     label: "1 ใหญ่ + 2 เล็ก",
     count: 3,
@@ -207,6 +220,33 @@ const photoFilters = [
     vignette: 0.42,
     grain: 0.16,
   },
+  {
+    id: "warm-memory",
+    label: "Warm Memory",
+    css: "sepia(0.42) saturate(0.88) hue-rotate(-9deg) contrast(0.88) brightness(1.04)",
+    canvas: "sepia(42%) saturate(88%) hue-rotate(-9deg) contrast(88%) brightness(104%)",
+    vignette: 0.12,
+    grain: 0.1,
+    tint: "rgba(244, 188, 70, 0.13)",
+  },
+  {
+    id: "golden-90s",
+    label: "Golden 90s",
+    css: "sepia(0.58) saturate(1.08) hue-rotate(-12deg) contrast(0.92) brightness(0.98)",
+    canvas: "sepia(58%) saturate(108%) hue-rotate(-12deg) contrast(92%) brightness(98%)",
+    vignette: 0.22,
+    grain: 0.15,
+    tint: "rgba(229, 156, 38, 0.1)",
+  },
+  {
+    id: "soft-cream",
+    label: "Soft Cream",
+    css: "sepia(0.22) saturate(0.72) contrast(0.82) brightness(1.12)",
+    canvas: "sepia(22%) saturate(72%) contrast(82%) brightness(112%)",
+    vignette: 0.08,
+    grain: 0.07,
+    tint: "rgba(255, 225, 166, 0.12)",
+  },
 ];
 
 const catStickers = Array.from({ length: 15 }, (_, index) => ({
@@ -267,6 +307,11 @@ function fitImage(ctx, img, x, y, w, h) {
 }
 
 function drawPhotoOverlay(ctx, x, y, w, h, filter) {
+  if (filter.tint) {
+    ctx.fillStyle = filter.tint;
+    ctx.fillRect(x, y, w, h);
+  }
+
   if (filter.vignette) {
     const gradient = ctx.createRadialGradient(
       x + w / 2,
@@ -613,6 +658,19 @@ export default function Home() {
       }
     });
 
+    if (currentLayout.caption) {
+      const lines = currentLayout.caption.split("\n");
+      ctx.save();
+      ctx.fillStyle = "#302b24";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = `600 ${Math.round(output.width * 0.035)}px "Noto Sans Thai", sans-serif`;
+      lines.forEach((line, index) => {
+        ctx.fillText(line, output.width * 0.915, output.height * (0.72 + index * 0.06));
+      });
+      ctx.restore();
+    }
+
     for (const sticker of stickers) {
       const img = await loadImage(sticker.src);
       const stickerWidth = output.width * 0.29 * sticker.scale;
@@ -842,6 +900,13 @@ export default function Home() {
                 )}
               </div>
             ))}
+            {currentLayout.caption ? (
+              <div className="frame-caption" aria-hidden="true">
+                {currentLayout.caption.split("\n").map((line, index) => (
+                  <span key={`${line}-${index}`}>{line}</span>
+                ))}
+              </div>
+            ) : null}
             {countdown ? <div className="countdown">{countdown}</div> : null}
             {isBoomerangCapturing ? <div className="boomerang-capture-flash">กำลังถ่าย</div> : null}
             <div className="sticker-layer">

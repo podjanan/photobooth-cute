@@ -512,6 +512,28 @@ button:disabled {
   transform: scaleX(-1);
 }
 
+.frame-caption {
+  position: absolute;
+  right: 3.1%;
+  bottom: 14.5%;
+  width: 13%;
+  display: grid;
+  gap: 0.15em;
+  color: #302b24;
+  font-family: "Noto Sans Thai", sans-serif;
+  font-size: clamp(9px, 2.7vw, 15px);
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  transform: rotate(-3deg);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.frame-caption span:nth-child(2) {
+  transform: translateX(5%);
+}
+
 .slot-placeholder {
   height: 100%;
   display: grid;
